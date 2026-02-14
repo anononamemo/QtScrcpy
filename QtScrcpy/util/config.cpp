@@ -4,7 +4,7 @@
 #include <QDebug>
 
 #include "config.h"
-#ifdef Q_OS_OSX
+#ifdef Q_OS_MACOS
 #include "path.h"
 #endif
 
@@ -145,9 +145,9 @@ const QString &Config::getConfigPath()
         QFileInfo fileInfo(s_configPath);
         if (s_configPath.isEmpty() || !fileInfo.isDir()) {
             // default application dir
-            // mac系统当从finder打开app时，默认工作目录不再是可执行程序的目录了，而是"/"
-            // 而Qt的获取工作目录的api都依赖QCoreApplication的初始化，所以使用mac api获取当前目录
-#ifdef Q_OS_OSX
+            // On macOS, when opening app from Finder, the default working directory is "/" instead of the executable directory
+            // Qt's working directory APIs depend on QCoreApplication initialization, so we use macOS API to get current path
+#ifdef Q_OS_MACOS
             // get */QtScrcpy.app path
             s_configPath = Path::GetCurrentPath();
             s_configPath += "/Contents/MacOS/config";
@@ -387,13 +387,13 @@ void Config::saveIpHistory(const QString &ip)
 {
     QStringList ipList = getIpHistory();
     
-    // 移除已存在的相同IP（避免重复）
+    // Remove duplicate IP
     ipList.removeAll(ip);
-    
-    // 将新IP添加到开头
+
+    // Add new IP to the beginning
     ipList.prepend(ip);
-    
-    // 限制历史记录数量
+
+    // Limit history size
     while (ipList.size() > IP_HISTORY_MAX) {
         ipList.removeLast();
     }
@@ -419,13 +419,13 @@ void Config::savePortHistory(const QString &port)
 {
     QStringList portList = getPortHistory();
     
-    // 移除已存在的相同Port（避免重复）
+    // Remove duplicate port
     portList.removeAll(port);
-    
-    // 将新Port添加到开头
+
+    // Add new port to the beginning
     portList.prepend(port);
-    
-    // 限制历史记录数量
+
+    // Limit history size
     while (portList.size() > PORT_HISTORY_MAX) {
         portList.removeLast();
     }

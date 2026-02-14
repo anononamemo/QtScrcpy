@@ -31,7 +31,7 @@ bool MagneticWidget::eventFilter(QObject *watched, QEvent *event)
     if (watched != m_adsorbWidget || !event) {
         return false;
     }
-    // 始终记录adsorbWidget最新size
+    // Always track the latest adsorbWidget size
     if (QEvent::Resize == event->type()) {
         m_adsorbWidgetSize = m_adsorbWidget->size();
     }

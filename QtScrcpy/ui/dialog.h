@@ -72,6 +72,7 @@ private slots:
 private:
     bool checkAdbRun();
     void initUI();
+    void updateDevices(bool verbose);
     void updateBootConfig(bool toView = true);
     void execAdbCmd();
     void delayMs(int ms);

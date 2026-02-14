@@ -16,15 +16,15 @@ class MagneticWidget : public QWidget
 public:
     enum AdsorbPosition
     {
-        AP_OUTSIDE_LEFT = 0x01,   // 吸附外部左边框
-        AP_OUTSIDE_TOP = 0x02,    // 吸附外部上边框
-        AP_OUTSIDE_RIGHT = 0x04,  // 吸附外部右边框
-        AP_OUTSIDE_BOTTOM = 0x08, // 吸附外部下边框
-        AP_INSIDE_LEFT = 0x10,    // 吸附内部左边框
-        AP_INSIDE_TOP = 0x20,     // 吸附内部上边框
-        AP_INSIDE_RIGHT = 0x40,   // 吸附内部右边框
-        AP_INSIDE_BOTTOM = 0x80,  // 吸附内部下边框
-        AP_ALL = 0xFF,            // 全吸附
+        AP_OUTSIDE_LEFT = 0x01,   // Snap to outer left edge
+        AP_OUTSIDE_TOP = 0x02,    // Snap to outer top edge
+        AP_OUTSIDE_RIGHT = 0x04,  // Snap to outer right edge
+        AP_OUTSIDE_BOTTOM = 0x08, // Snap to outer bottom edge
+        AP_INSIDE_LEFT = 0x10,    // Snap to inner left edge
+        AP_INSIDE_TOP = 0x20,     // Snap to inner top edge
+        AP_INSIDE_RIGHT = 0x40,   // Snap to inner right edge
+        AP_INSIDE_BOTTOM = 0x80,  // Snap to inner bottom edge
+        AP_ALL = 0xFF,            // Snap to all edges
     };
     Q_DECLARE_FLAGS(AdsorbPositions, AdsorbPosition)
 
@@ -46,8 +46,8 @@ private:
     QPoint m_relativePos;
     bool m_adsorbed = false;
     QPointer<QWidget> m_adsorbWidget;
-    // 单独记录adsorbWidgetSize，因为Widget setGeometry的时候，会先收到Move事件，后收到Resize事件，
-    // 但是收到Move事件时Widget的size()已经是setGeometry指定的size了
+    // Track adsorbWidgetSize separately: when setGeometry is called, Move event arrives before Resize,
+    // but Widget::size() already returns the new size during the Move event
     QSize m_adsorbWidgetSize;
     AdsorbPosition m_curAdsorbPosition;
 };

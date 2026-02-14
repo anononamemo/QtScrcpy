@@ -16,6 +16,10 @@
 #include "../util/winutils.h"
 #endif
 
+#ifdef Q_OS_MACOS
+#include "macosglasseffect.h"
+#endif
+
 QString s_keyMapPath = "";
 
 const QString &getKeyMapPath()
@@ -40,7 +44,7 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
     on_useSingleModeCheck_clicked();
     on_updateDevice_clicked();
 
-    connect(&m_autoUpdatetimer, &QTimer::timeout, this, &Dialog::on_updateDevice_clicked);
+    connect(&m_autoUpdatetimer, &QTimer::timeout, this, [this]() { this->updateDevices(false); });
     if (ui->autoUpdatecheckBox->isChecked()) {
         m_autoUpdatetimer.start(5000);
     }
@@ -54,8 +58,7 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
         case qsc::AdbProcess::AER_ERROR_START:
             break;
         case qsc::AdbProcess::AER_SUCCESS_START:
-            log = "adb run";
-            newLine = false;
+            // Silent — no log for routine ADB start
             break;
         case qsc::AdbProcess::AER_ERROR_EXEC:
             //log = m_adb.getErrorOut();
@@ -64,7 +67,7 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
             }
             break;
         case qsc::AdbProcess::AER_ERROR_MISSING_BINARY:
-            log = "adb not found";
+            log = tr("ADB not found. Check installation");
             break;
         case qsc::AdbProcess::AER_SUCCESS_EXEC:
             //log = m_adb.getStdOut();
@@ -79,21 +82,21 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
             } else if (args.contains("show") && args.contains("wlan0")) {
                 QString ip = m_adb.getDeviceIPFromStdOut();
                 if (ip.isEmpty()) {
-                    log = "ip not find, connect to wifi?";
+                    log = tr("IP not found. Is the device connected to Wi-Fi?");
                     break;
                 }
                 ui->deviceIpEdt->setEditText(ip);
             } else if (args.contains("ifconfig") && args.contains("wlan0")) {
                 QString ip = m_adb.getDeviceIPFromStdOut();
                 if (ip.isEmpty()) {
-                    log = "ip not find, connect to wifi?";
+                    log = tr("IP not found. Is the device connected to Wi-Fi?");
                     break;
                 }
                 ui->deviceIpEdt->setEditText(ip);
             } else if (args.contains("ip -o a")) {
                 QString ip = m_adb.getDeviceIPByIpFromStdOut();
                 if (ip.isEmpty()) {
-                    log = "ip not find, connect to wifi?";
+                    log = tr("IP not found. Is the device connected to Wi-Fi?");
                     break;
                 }
                 ui->deviceIpEdt->setEditText(ip);
@@ -153,6 +156,32 @@ void Dialog::initUI()
     WinUtils::setDarkBorderToWindow((HWND)this->winId(), true);
 #endif
 
+#ifdef Q_OS_MACOS
+    // Unified titlebar: content extends under traffic lights
+    MacOSNative::applyUnifiedTitlebar(this);
+
+    // Add top padding so content doesn't overlap traffic light buttons
+    qreal tbHeight = MacOSNative::titlebarHeight(this);
+    if (ui->leftWidget->layout()) {
+        ui->leftWidget->layout()->setContentsMargins(14, static_cast<int>(tbHeight) + 6, 8, 14);
+    }
+    if (ui->rightWidget->layout()) {
+        ui->rightWidget->layout()->setContentsMargins(6, static_cast<int>(tbHeight) + 2, 10, 10);
+    }
+
+    // Vibrant window appearance — adapts to system dark/light mode.
+    // Gives native translucent titlebar without breaking Qt's Metal rendering.
+    MacOSNative::applyVibrantAppearance(this);
+#endif
+
+    // UX: hide technical elements for a cleaner, user-friendly interface
+    ui->label_9->hide();       // "device name:" label
+    ui->userNameEdt->hide();   // device name input
+    ui->updateNameBtn->hide(); // "update name" button
+    ui->getIPBtn->hide();      // "get device IP" — too technical
+    ui->startAdbdBtn->hide();  // "start adbd" — too technical
+    ui->adbGroupBox->hide();   // entire adb command section — advanced users only
+
     ui->bitRateEdit->setValidator(new QIntValidator(1, 99999, this));
 
     ui->maxSizeBox->addItem("640");
@@ -172,20 +201,20 @@ void Dialog::initUI()
     ui->lockOrientationBox->addItem("270");
     ui->lockOrientationBox->setCurrentIndex(0);
 
-    // 加载IP历史记录
+    // Load IP history
     loadIpHistory();
 
-    // 加载端口历史记录
+    // Load port history
     loadPortHistory();
 
-    // 为deviceIpEdt添加右键菜单
+    // Add context menu for deviceIpEdt
     if (ui->deviceIpEdt->lineEdit()) {
         ui->deviceIpEdt->lineEdit()->setContextMenuPolicy(Qt::CustomContextMenu);
         connect(ui->deviceIpEdt->lineEdit(), &QWidget::customContextMenuRequested,
                 this, &Dialog::showIpEditMenu);
     }
     
-    // 为devicePortEdt添加右键菜单
+    // Add context menu for devicePortEdt
     if (ui->devicePortEdt->lineEdit()) {
         ui->devicePortEdt->lineEdit()->setContextMenuPolicy(Qt::CustomContextMenu);
         connect(ui->devicePortEdt->lineEdit(), &QWidget::customContextMenuRequested,
@@ -243,7 +272,7 @@ void Dialog::updateBootConfig(bool toView)
         config.autoUpdateDevice = ui->autoUpdatecheckBox->isChecked();
         config.showToolbar = ui->showToolbar->isChecked();
 
-        // 保存当前IP到历史记录
+        // Save current IP to history
         QString currentIp = ui->deviceIpEdt->currentText().trimmed();
         if (!currentIp.isEmpty()) {
             saveIpHistory(currentIp);
@@ -259,7 +288,7 @@ void Dialog::execAdbCmd()
         return;
     }
     QString cmd = ui->adbCommandEdt->text().trimmed();
-    outLog("adb " + cmd, false);
+    outLog(tr("Executing: adb ") + cmd, false);
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
     m_adb.execute(ui->serialBox->currentText().trimmed(), cmd.split(" ", Qt::SkipEmptyParts));
 #else
@@ -284,7 +313,7 @@ QString Dialog::getGameScript(const QString &fileName)
 
     QFile loadFile(getKeyMapPath() + "/" + fileName);
     if (!loadFile.open(QIODevice::ReadOnly)) {
-        outLog("open file failed:" + fileName, true);
+        outLog(tr("Failed to open file: ") + fileName, true);
         return "";
     }
 
@@ -321,16 +350,23 @@ void Dialog::closeEvent(QCloseEvent *event)
 
 void Dialog::on_updateDevice_clicked()
 {
-    if (checkAdbRun()) {
+    updateDevices(true);
+}
+
+void Dialog::updateDevices(bool verbose)
+{
+    if (m_adb.isRuning()) {
         return;
     }
-    outLog("update devices...", false);
+    if (verbose) {
+        outLog(tr("Searching for devices..."), false);
+    }
     m_adb.execute("", QStringList() << "devices");
 }
 
 void Dialog::on_startServerBtn_clicked()
 {
-    outLog("start server...", false);
+    outLog(tr("Connecting to device..."), false);
 
     // this is ok that "original" toUshort is 0
     quint16 videoSize = ui->maxSizeBox->currentText().trimmed().toUShort();
@@ -367,7 +403,7 @@ void Dialog::on_startServerBtn_clicked()
 void Dialog::on_stopServerBtn_clicked()
 {
     if (qsc::IDeviceManage::getInstance().disconnectDevice(ui->serialBox->currentText().trimmed())) {
-        outLog("stop server");
+        outLog(tr("Device disconnected"));
     }
 }
 
@@ -378,7 +414,7 @@ void Dialog::on_wirelessConnectBtn_clicked()
     }
     QString addr = ui->deviceIpEdt->currentText().trimmed();
     if (addr.isEmpty()) {
-        outLog("error: device ip is null", false);
+        outLog(tr("Enter the device IP address"), false);
         return;
     }
 
@@ -389,23 +425,23 @@ void Dialog::on_wirelessConnectBtn_clicked()
         addr += ":";
         addr += ui->devicePortEdt->lineEdit()->placeholderText().trimmed();
     } else {
-        outLog("error: device port is null", false);
+        outLog(tr("Enter the device port"), false);
         return;
     }
 
-    // 保存IP历史记录 - 只保存IP部分,不包含端口
+    // Save IP history - only save IP part, without port
     QString ip = addr.split(":").first();
     if (!ip.isEmpty()) {
         saveIpHistory(ip);
     }
     
-    // 保存端口历史记录
+    // Save port history
     QString port = addr.split(":").last();
     if (!port.isEmpty() && port != ip) {
         savePortHistory(port);
     }
 
-    outLog("wireless connect...", false);
+    outLog(tr("Connecting via Wi-Fi..."), false);
     QStringList adbArgs;
     adbArgs << "connect";
     adbArgs << addr;
@@ -417,7 +453,7 @@ void Dialog::on_startAdbdBtn_clicked()
     if (checkAdbRun()) {
         return;
     }
-    outLog("start devices adbd...", false);
+    outLog(tr("Starting remote access..."), false);
     // adb tcpip 5555
     QStringList adbArgs;
     adbArgs << "tcpip";
@@ -439,11 +475,49 @@ void Dialog::outLog(const QString &log, bool newLine)
 
 bool Dialog::filterLog(const QString &log)
 {
-    if (log.contains("app_proces")) {
-        return true;
-    }
-    if (log.contains("Unable to set geometry")) {
-        return true;
+    // Filter out technical noise that confuses users
+    static const QStringList filters = {
+        "app_proces",
+        "Unable to set geometry",
+        "AdbProcessImpl::",
+        "adb path:",
+        "adb return",
+        "show event",
+        "hide event",
+        "MacOSGlassEffect:",
+        "AudioOutput::",
+        "server process stop",
+        "stream thread stop",
+        "readInfo",
+        "Convert::src frame",
+        "decoder frame format",
+        "End of frames",
+        "Device clipboard",
+        "Computer clipboard",
+        "current keymap mode:",
+        "Script updated",
+        "FPS:",
+        "QtScrcpy ",
+        "feishu.cn",
+        "t.me/",
+        "github.com/barry-ran",
+        "completely open source",
+        "open source and free",
+        "batch control mirror",
+        "game keymap mirror",
+        "contact me with telegram",
+        "Telegram <https",
+        "QuickMirror",
+        "QuickAssistant",
+        "over the maximum",
+        "no port available",
+        "free port",
+        "server start finish",
+    };
+    for (const auto &f : filters) {
+        if (log.contains(f)) {
+            return true;
+        }
     }
     return false;
 }
@@ -451,7 +525,7 @@ bool Dialog::filterLog(const QString &log)
 bool Dialog::checkAdbRun()
 {
     if (m_adb.isRuning()) {
-        outLog("wait for the end of the current command to run");
+        outLog(tr("Please wait, previous command is still running"));
     }
     return m_adb.isRuning();
 }
@@ -462,7 +536,7 @@ void Dialog::on_getIPBtn_clicked()
         return;
     }
 
-    outLog("get ip...", false);
+    outLog(tr("Getting IP address..."), false);
     // adb -s P7C0218510000537 shell ifconfig wlan0
     // or
     // adb -s P7C0218510000537 shell ip -f inet addr show wlan0
@@ -537,7 +611,7 @@ void Dialog::onDeviceConnected(bool success, const QString &serial, const QStrin
     }
 
 #ifdef Q_OS_WIN32
-    // windows是show太早可以看到resize的过程
+    // On Windows, showing too early reveals the resize process
     QTimer::singleShot(200, videoForm, [videoForm](){videoForm->show();});
 #endif
 
@@ -566,7 +640,7 @@ void Dialog::on_wirelessDisConnectBtn_clicked()
         return;
     }
     QString addr = ui->deviceIpEdt->currentText().trimmed();
-    outLog("wireless disconnect...", false);
+    outLog(tr("Disconnecting Wi-Fi..."), false);
     QStringList adbArgs;
     adbArgs << "disconnect";
     adbArgs << addr;
@@ -611,7 +685,7 @@ void Dialog::on_refreshGameScriptBtn_clicked()
     ui->gameBox->clear();
     QDir dir(getKeyMapPath());
     if (!dir.exists()) {
-        outLog("keymap directory not find", true);
+        outLog(tr("Keymap folder not found"), true);
         return;
     }
     dir.setFilter(QDir::Files | QDir::NoSymLinks);
@@ -643,7 +717,7 @@ void Dialog::on_recordScreenCheck_clicked(bool checked)
 
     QString fileDir(ui->recordPathEdt->text().trimmed());
     if (fileDir.isEmpty()) {
-        qWarning() << "please select record save path!!!";
+        outLog(tr("Select a folder to save recordings"));
         ui->recordScreenCheck->setChecked(false);
     }
 }
@@ -657,7 +731,7 @@ void Dialog::on_usbConnectBtn_clicked()
 
     int firstUsbDevice = findDeviceFromeSerialBox(false);
     if (-1 == firstUsbDevice) {
-        qWarning() << "No use device is found!";
+        outLog(tr("Device not found. Connect your phone via USB"));
         return;
     }
     ui->serialBox->setCurrentIndex(firstUsbDevice);
@@ -698,7 +772,7 @@ void Dialog::on_wifiConnectBtn_clicked()
 
     int firstUsbDevice = findDeviceFromeSerialBox(false);
     if (-1 == firstUsbDevice) {
-        qWarning() << "No use device is found!";
+        outLog(tr("Device not found. Connect your phone via USB"));
         return;
     }
     ui->serialBox->setCurrentIndex(firstUsbDevice);
@@ -717,7 +791,7 @@ void Dialog::on_wifiConnectBtn_clicked()
 
     int firstWifiDevice = findDeviceFromeSerialBox(true);
     if (-1 == firstWifiDevice) {
-        qWarning() << "No wifi device is found!";
+        outLog(tr("Wi-Fi device not found"));
         return;
     }
     ui->serialBox->setCurrentIndex(firstWifiDevice);
@@ -745,7 +819,7 @@ void Dialog::on_updateNameBtn_clicked()
 
         qDebug() << "Update OK!";
     } else {
-        qWarning() << "No device is connected!";
+        outLog(tr("No devices connected"));
     }
 }
 
@@ -787,7 +861,7 @@ const QString &Dialog::getServerPath()
 void Dialog::on_startAudioBtn_clicked()
 {
     if (ui->serialBox->count() == 0) {
-        qWarning() << "No device is connected!";
+        outLog(tr("No devices connected"));
         return;
     }
 
@@ -802,7 +876,7 @@ void Dialog::on_stopAudioBtn_clicked()
 void Dialog::on_installSndcpyBtn_clicked()
 {
     if (ui->serialBox->count() == 0) {
-        qWarning() << "No device is connected!";
+        outLog(tr("No devices connected"));
         return;
     }
     m_audioOutput.installonly(ui->serialBox->currentText(), 28200);
@@ -838,7 +912,7 @@ void Dialog::saveIpHistory(const QString &ip)
     
     Config::getInstance().saveIpHistory(ip);
     
-    // 更新ComboBox
+    // Update ComboBox
     loadIpHistory();
     ui->deviceIpEdt->setCurrentText(ip);
 }
@@ -880,7 +954,7 @@ void Dialog::savePortHistory(const QString &port)
     
     Config::getInstance().savePortHistory(port);
     
-    // 更新ComboBox
+    // Update ComboBox
     loadPortHistory();
     ui->devicePortEdt->setCurrentText(port);
 }

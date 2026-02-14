@@ -14,6 +14,9 @@
 #include "config.h"
 #include "dialog.h"
 #include "mousetap/mousetap.h"
+#ifdef Q_OS_MACOS
+#include "macosglasseffect.h"
+#endif
 
 static Dialog *g_mainDlg = Q_NULLPTR;
 static QtMessageHandler g_oldMessageHandler = Q_NULLPTR;
@@ -33,7 +36,7 @@ int main(int argc, char *argv[])
     qputenv("QTSCRCPY_CONFIG_PATH", "../../../config");
 #endif
 
-#ifdef Q_OS_OSX
+#ifdef Q_OS_MACOS
     qputenv("QTSCRCPY_ADB_PATH", "../../../../../../QtScrcpy/QtScrcpyCore/src/third_party/adb/mac/adb");
     qputenv("QTSCRCPY_SERVER_PATH", "../../../../../../QtScrcpy/QtScrcpyCore/src/third_party/scrcpy-server");
     qputenv("QTSCRCPY_KEYMAP_PATH", "../../../../../../keymap");
@@ -102,8 +105,8 @@ int main(int argc, char *argv[])
     }
 #endif
 
-    // windows下通过qmake VERSION变量或者rc设置版本号和应用名称后，这里可以直接拿到
-    // mac下拿到的是CFBundleVersion的值
+    // On Windows, version and app name are set via qmake VERSION variable or rc file
+    // On macOS, this returns the CFBundleVersion value
     qDebug() << a.applicationVersion();
     qDebug() << a.applicationName();
 
@@ -115,11 +118,19 @@ int main(int argc, char *argv[])
     }
 
     installTranslator();
-#if defined(Q_OS_WIN32) || defined(Q_OS_OSX)
+#if defined(Q_OS_WIN32) || defined(Q_OS_MACOS)
     MouseTap::getInstance()->initMouseEventTap();
 #endif
 
-    // load style sheet
+#ifdef Q_OS_MACOS
+    // macOS: use system palette (auto dark/light). Load minimal CSS only.
+    QFile macStyleFile(":/qss/macos.css");
+    if (macStyleFile.open(QFile::ReadOnly)) {
+        qApp->setStyleSheet(QLatin1String(macStyleFile.readAll()));
+        macStyleFile.close();
+    }
+#else
+    // Windows/Linux: full dark theme
     QFile file(":/qss/psblack.css");
     if (file.open(QFile::ReadOnly)) {
         QString qss = QLatin1String(file.readAll());
@@ -128,28 +139,33 @@ int main(int argc, char *argv[])
         qApp->setStyleSheet(qss);
         file.close();
     }
+#endif
 
     qsc::AdbProcess::setAdbPath(Config::getInstance().getAdbPath());
 
     g_mainDlg = new Dialog {};
     g_mainDlg->show();
 
-    qInfo() << QObject::tr("This software is completely open source and free. Use it at your own risk. You can download it at the "
+#ifdef Q_OS_MACOS
+    // Observe system dark/light mode changes — force repaint
+    MacOSNative::observeThemeChanges([](bool isDark) {
+        Q_UNUSED(isDark);
+        for (QWidget *w : QApplication::topLevelWidgets()) {
+            w->update();
+        }
+    });
+#endif
+
+    // Startup info — console only, not shown in UI log
+    qDebug() << QObject::tr("This software is completely open source and free. Use it at your own risk. You can download it at the "
             "following address:");
-    qInfo() << QString("QtScrcpy %1 <https://github.com/barry-ran/QtScrcpy>").arg(QCoreApplication::applicationVersion());
-
-    qInfo() << QObject::tr("If you need more professional batch control mirror software, you can try the following software:");
-    qInfo() << QString(QObject::tr("QuickMirror") + " <https://lrbnfell4p.feishu.cn/drive/folder/KviYfz5uFlpUT8dXgdjccmfUnse>");
-
-    qInfo() << QObject::tr("If you need more professional game keymap mirror software, you can try the following software:");
-    qInfo() << QString(QObject::tr("QuickAssistant") + " <https://lrbnfell4p.feishu.cn/drive/folder/Hqckfxj5el1Wjpd9uezcX71lnBh>");
-
-    qInfo() << QObject::tr("You can contact me with telegram <https://t.me/+Ylf_5V_rDCMyODQ1>");
+    qDebug() << QString("QtScrcpy %1 <https://github.com/barry-ran/QtScrcpy>").arg(QCoreApplication::applicationVersion());
+    qDebug() << QObject::tr("You can contact me with telegram <https://t.me/+Ylf_5V_rDCMyODQ1>");
 
     int ret = a.exec();
     delete g_mainDlg;
 
-#if defined(Q_OS_WIN32) || defined(Q_OS_OSX)
+#if defined(Q_OS_WIN32) || defined(Q_OS_MACOS)
     MouseTap::getInstance()->quitMouseEventTap();
 #endif
     return ret;
@@ -161,21 +177,21 @@ void installTranslator()
     QLocale locale;
     QLocale::Language language = locale.language();
 
-    if (Config::getInstance().getLanguage() == "zh_CN") {
-        language = QLocale::Chinese;
-    } else if (Config::getInstance().getLanguage() == "en_US") {
+    if (Config::getInstance().getLanguage() == "en_US") {
         language = QLocale::English;
     } else if (Config::getInstance().getLanguage() == "ja_JP") {
         language = QLocale::Japanese;
+    } else if (Config::getInstance().getLanguage() == "ru_RU") {
+        language = QLocale::Russian;
     }
 
     QString languagePath = ":/i18n/";
     switch (language) {
-    case QLocale::Chinese:
-        languagePath += "zh_CN.qm";
-        break;
     case QLocale::Japanese:
         languagePath += "ja_JP.qm";
+        break;
+    case QLocale::Russian:
+        languagePath += "ru_RU.qm";
         break;
     case QLocale::English:
     default:

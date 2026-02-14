@@ -43,7 +43,7 @@ message(STATUS "[${PROJECT_NAME}] CPU_ARCH:${QC_CPU_ARCH}")
 
 # CMake set
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # default RelWithDebInfo
@@ -114,6 +114,7 @@ if (QT_DESIRED_VERSION MATCHES 6)
     # list(APPEND qt_required_components Core5Compat)
     list(APPEND qt_required_components OpenGL)
     list(APPEND qt_required_components OpenGLWidgets)
+    list(APPEND qt_required_components GuiPrivate)
 else()
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         list(APPEND qt_required_components X11Extras )
@@ -149,6 +150,8 @@ message(STATUS "[${PROJECT_NAME}] Qt version is: ${QT_DESIRED_VERSION}")
 set(QC_FONTAWESOME_SOURCES
     fontawesome/iconhelper.h
     fontawesome/iconhelper.cpp
+    fontawesome/iconprovider.h
+    fontawesome/iconprovider.cpp
 )
 source_group(fontawesome FILES ${QC_FONTAWESOME_SOURCES})
 
@@ -213,11 +216,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     )
 endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    set(QC_UTIL_SOURCES ${QC_UTIL_SOURCES} 
+    set(QC_UTIL_SOURCES ${QC_UTIL_SOURCES}
         util/mousetap/cocoamousetap.h
         util/mousetap/cocoamousetap.mm
         util/path.h
         util/path.mm
+        util/macosglasseffect.h
+        util/macosglasseffect.mm
     )
 endif()
 source_group(util FILES ${QC_UTIL_SOURCES})
@@ -251,7 +256,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     )
 endif()
 
-# 翻译相关（使用shell脚本替代cmake处理翻译）
+# Translation (using shell scripts instead of cmake for translation handling)
 # add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/res/i18n)
 
 # all sources
@@ -296,10 +301,10 @@ target_include_directories(${PROJECT_NAME} PRIVATE render)
 get_property(QC_IS_MUTIL_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 message(STATUS "multi config:" QC_IS_MUTIL_CONFIG)
 
-# $<0:> 使用生成器表达式为每个config设置RUNTIME_OUTPUT_DIRECTORY，这样multi config就不会自动追加CMAKE_BUILD_TYPE子目录了
-# 1. multi config介绍 https://cmake.org/cmake/help/latest/prop_gbl/GENERATOR_IS_MULTI_CONFIG.html
-# 2. multi config在不用表达式生成器时自动追加子目录说明 https://cmake.org/cmake/help/latest/prop_tgt/RUNTIME_OUTPUT_DIRECTORY.html
-# 3. 使用表达式生成器禁止multi config自动追加子目录解决方案 https://stackoverflow.com/questions/7747857/in-cmake-how-do-i-work-around-the-debug-and-release-directories-visual-studio-2
+# $<0:> Use generator expression to set RUNTIME_OUTPUT_DIRECTORY per config, preventing multi-config from auto-appending CMAKE_BUILD_TYPE subdirectory
+# 1. Multi config info: https://cmake.org/cmake/help/latest/prop_gbl/GENERATOR_IS_MULTI_CONFIG.html
+# 2. Multi config auto-appends subdirectory without generator expression: https://cmake.org/cmake/help/latest/prop_tgt/RUNTIME_OUTPUT_DIRECTORY.html
+# 3. Solution using generator expression: https://stackoverflow.com/questions/7747857/in-cmake-how-do-i-work-around-the-debug-and-release-directories-visual-studio-2
 set_target_properties(${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../output/${QC_CPU_ARCH}/${CMAKE_BUILD_TYPE}/$<0:>"
 )

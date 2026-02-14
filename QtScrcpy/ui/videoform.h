@@ -87,6 +87,12 @@ private:
 
     //Whether to display the toolbar when connecting a device.
     bool show_toolbar = true;
+
+#ifdef Q_OS_MACOS
+    void *m_nativeToolbarController = nullptr;
+    void setupNativeToolbar();
+    void handleNativeToolbarAction(const QString &identifier);
+#endif
 };
 
 #endif // VIDEOFORM_H

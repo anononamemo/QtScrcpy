@@ -3,7 +3,7 @@
 #include <QMouseEvent>
 #include <QShowEvent>
 
-#include "iconhelper.h"
+#include "iconprovider.h"
 #include "toolform.h"
 #include "ui_toolform.h"
 #include "videoform.h"
@@ -37,22 +37,22 @@ bool ToolForm::isHost()
 
 void ToolForm::initStyle()
 {
-    IconHelper::Instance()->SetIcon(ui->fullScreenBtn, QChar(0xf0b2), 15);
-    IconHelper::Instance()->SetIcon(ui->menuBtn, QChar(0xf096), 15);
-    IconHelper::Instance()->SetIcon(ui->homeBtn, QChar(0xf1db), 15);
-    //IconHelper::Instance()->SetIcon(ui->returnBtn, QChar(0xf104), 15);
-    IconHelper::Instance()->SetIcon(ui->returnBtn, QChar(0xf053), 15);
-    IconHelper::Instance()->SetIcon(ui->appSwitchBtn, QChar(0xf24d), 15);
-    IconHelper::Instance()->SetIcon(ui->volumeUpBtn, QChar(0xf028), 15);
-    IconHelper::Instance()->SetIcon(ui->volumeDownBtn, QChar(0xf027), 15);
-    IconHelper::Instance()->SetIcon(ui->openScreenBtn, QChar(0xf06e), 15);
-    IconHelper::Instance()->SetIcon(ui->closeScreenBtn, QChar(0xf070), 15);
-    IconHelper::Instance()->SetIcon(ui->powerBtn, QChar(0xf011), 15);
-    IconHelper::Instance()->SetIcon(ui->expandNotifyBtn, QChar(0xf103), 15);
-    IconHelper::Instance()->SetIcon(ui->screenShotBtn, QChar(0xf0c4), 15);
-    IconHelper::Instance()->SetIcon(ui->touchBtn, QChar(0xf111), 15);
-    IconHelper::Instance()->SetIcon(ui->groupControlBtn, QChar(0xf0c0), 15);
-    IconHelper::Instance()->SetIcon(ui->clipboardBtn, QChar(0xf0c5), 15);
+    auto *ip = IconProvider::instance();
+    ip->setIcon(ui->fullScreenBtn,   "arrow.up.left.and.arrow.down.right", QChar(0xf0b2), 15);
+    ip->setIcon(ui->menuBtn,         "square",                              QChar(0xf096), 15);
+    ip->setIcon(ui->homeBtn,         "house",                               QChar(0xf1db), 15);
+    ip->setIcon(ui->returnBtn,       "chevron.left",                        QChar(0xf053), 15);
+    ip->setIcon(ui->appSwitchBtn,    "rectangle.on.rectangle",              QChar(0xf24d), 15);
+    ip->setIcon(ui->volumeUpBtn,     "speaker.wave.3",                      QChar(0xf028), 15);
+    ip->setIcon(ui->volumeDownBtn,   "speaker.wave.1",                      QChar(0xf027), 15);
+    ip->setIcon(ui->openScreenBtn,   "eye",                                 QChar(0xf06e), 15);
+    ip->setIcon(ui->closeScreenBtn,  "eye.slash",                           QChar(0xf070), 15);
+    ip->setIcon(ui->powerBtn,        "power",                               QChar(0xf011), 15);
+    ip->setIcon(ui->expandNotifyBtn, "chevron.down.2",                      QChar(0xf103), 15);
+    ip->setIcon(ui->screenShotBtn,   "scissors",                            QChar(0xf0c4), 15);
+    ip->setIcon(ui->touchBtn,        "hand.tap",                            QChar(0xf111), 15);
+    ip->setIcon(ui->groupControlBtn, "person.2",                            QChar(0xf0c0), 15);
+    ip->setIcon(ui->clipboardBtn,    "doc.on.doc",                          QChar(0xf0c5), 15);
 }
 
 void ToolForm::updateGroupControl()

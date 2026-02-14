@@ -18,12 +18,15 @@
 #endif
 
 #include "config.h"
-#include "iconhelper.h"
 #include "qyuvopenglwidget.h"
 #include "toolform.h"
 #include "mousetap/mousetap.h"
 #include "ui_videoform.h"
 #include "videoform.h"
+
+#ifdef Q_OS_MACOS
+#include "macosglasseffect.h"
+#endif
 
 VideoForm::VideoForm(bool framelessWindow, bool skin, bool showToolbar, QWidget *parent) : QWidget(parent), ui(new Ui::videoForm), m_skin(skin)
 {
@@ -36,13 +39,26 @@ VideoForm::VideoForm(bool framelessWindow, bool skin, bool showToolbar, QWidget 
     if (m_skin) {
         updateStyleSheet(vertical);
     }
+#ifdef Q_OS_MACOS
+    // macOS non-skin: keep native window chrome (no FramelessWindowHint)
+    if (framelessWindow && m_skin) {
+        setWindowFlags(windowFlags() | Qt::FramelessWindowHint);
+    }
+#else
     if (framelessWindow) {
         setWindowFlags(windowFlags() | Qt::FramelessWindowHint);
     }
+#endif
 }
 
 VideoForm::~VideoForm()
 {
+#ifdef Q_OS_MACOS
+    if (m_nativeToolbarController) {
+        MacOSNative::destroyNativeToolbar(m_nativeToolbarController);
+        m_nativeToolbarController = nullptr;
+    }
+#endif
     delete ui;
 }
 
@@ -54,11 +70,11 @@ void VideoForm::initUI()
             m_widthHeightRatio = 1.0f * phone.width() / phone.height();
         }
 
-#ifndef Q_OS_OSX
-        // mac下去掉标题栏影响showfullscreen
-        // 去掉标题栏
+#ifndef Q_OS_MACOS
+        // On macOS removing title bar affects showFullScreen
+        // Remove title bar
         setWindowFlags(windowFlags() | Qt::FramelessWindowHint);
-        // 根据图片构造异形窗口
+        // Create shaped window based on image
         setAttribute(Qt::WA_TranslucentBackground);
 #endif
     }
@@ -96,7 +112,7 @@ QRect VideoForm::getGrabCursorRect()
     rc.setY(rc.y() + 10);
     rc.setWidth(rc.width() - 20);
     rc.setHeight(rc.height() - 20);
-#elif defined(Q_OS_OSX)
+#elif defined(Q_OS_MACOS)
     rc = m_videoWidget->geometry();
     rc.setTopLeft(ui->keepRatioWidget->mapToGlobal(rc.topLeft()));
     rc.setBottomRight(ui->keepRatioWidget->mapToGlobal(rc.bottomRight()));
@@ -168,6 +184,16 @@ void VideoForm::setSerial(const QString &serial)
 
 void VideoForm::showToolForm(bool show)
 {
+#ifdef Q_OS_MACOS
+    if (!m_skin) {
+        // Non-skin mode on macOS: use native NSToolbar
+        if (show && !m_nativeToolbarController) {
+            setupNativeToolbar();
+        }
+        return;
+    }
+#endif
+    // Skin mode (all platforms) or non-macOS: use floating ToolForm
     if (!m_toolForm) {
         m_toolForm = new ToolForm(this, ToolForm::AP_OUTSIDE_RIGHT);
         m_toolForm->setSerial(m_serial);
@@ -176,6 +202,41 @@ void VideoForm::showToolForm(bool show)
     m_toolForm->setVisible(show);
 }
 
+#ifdef Q_OS_MACOS
+void VideoForm::setupNativeToolbar()
+{
+    if (m_skin) return;
+
+    QStringList items = {
+        "Home", "Back", "AppSwitch",
+        "NSToolbarFlexibleSpaceItem",
+        "Power", "VolumeUp", "VolumeDown",
+        "NSToolbarFlexibleSpaceItem",
+        "Screenshot", "FullScreen"
+    };
+
+    m_nativeToolbarController = MacOSNative::createNativeToolbar(
+        this, items,
+        [this](const QString &id) { this->handleNativeToolbarAction(id); }
+    );
+}
+
+void VideoForm::handleNativeToolbarAction(const QString &identifier)
+{
+    auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
+    if (!device) return;
+
+    if (identifier == "Home")           device->postGoHome();
+    else if (identifier == "Back")      device->postGoBack();
+    else if (identifier == "AppSwitch") device->postAppSwitch();
+    else if (identifier == "Power")     device->postPower();
+    else if (identifier == "VolumeUp")  device->postVolumeUp();
+    else if (identifier == "VolumeDown") device->postVolumeDown();
+    else if (identifier == "Screenshot") device->screenshot();
+    else if (identifier == "FullScreen") switchFullScreen();
+}
+#endif
+
 void VideoForm::moveCenter()
 {
     QRect screenRect = getScreenRect();
@@ -183,7 +244,7 @@ void VideoForm::moveCenter()
         qWarning() << "getScreenRect is empty";
         return;
     }
-    // 窗口居中
+    // Center window
     move(screenRect.center() - QRect(0, 0, size().width(), size().height()).center());
 }
 
@@ -463,7 +524,7 @@ void VideoForm::updateShowSize(const QSize &newSize)
 void VideoForm::switchFullScreen()
 {
     if (isFullScreen()) {
-        // 横屏全屏铺满全屏，恢复时，恢复保持宽高比
+        // Landscape fullscreen fills the screen; restore aspect ratio when exiting
         if (m_widthHeightRatio > 1.0f) {
             ui->keepRatioWidget->setWidthHeightRatio(m_widthHeightRatio);
         }
@@ -474,7 +535,7 @@ void VideoForm::switchFullScreen()
         // fullscreen window will move (0,0). qt bug?
         move(m_fullScreenBeforePos);
 
-#ifdef Q_OS_OSX
+#ifdef Q_OS_MACOS
         //setWindowFlags(windowFlags() | Qt::FramelessWindowHint);
         //show();
 #endif
@@ -486,7 +547,7 @@ void VideoForm::switchFullScreen()
         ::SetThreadExecutionState(ES_CONTINUOUS);
 #endif
     } else {
-        // 横屏全屏铺满全屏，不保持宽高比
+        // Landscape fullscreen fills the screen without preserving aspect ratio
         if (m_widthHeightRatio > 1.0f) {
             ui->keepRatioWidget->setWidthHeightRatio(-1.0f);
         }
@@ -495,9 +556,9 @@ void VideoForm::switchFullScreen()
         m_normalSize = size();
 
         m_fullScreenBeforePos = pos();
-        // 这种临时增加标题栏再全屏的方案会导致收不到mousemove事件，导致setmousetrack失效
+        // Temporarily adding title bar before fullscreen causes mousemove events to stop working
         // mac fullscreen must show title bar
-#ifdef Q_OS_OSX
+#ifdef Q_OS_MACOS
         //setWindowFlags(windowFlags() & ~Qt::FramelessWindowHint);
 #endif
         showToolForm(false);
@@ -506,7 +567,7 @@ void VideoForm::switchFullScreen()
         }
         showFullScreen();
 
-        // 全屏状态禁止电脑休眠、息屏
+        // Prevent system sleep and screen off during fullscreen
 #ifdef Q_OS_WIN32
         ::SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
 #endif
@@ -773,7 +834,7 @@ void VideoForm::resizeEvent(QResizeEvent *event)
         return;
     }
     QSize curSize = size();
-    // 限制VideoForm尺寸不能小于keepRatioWidget good size
+    // Restrict VideoForm size to be no smaller than keepRatioWidget good size
     if (m_widthHeightRatio > 1.0f) {
         // hor
         if (curSize.height() <= goodSize.height()) {

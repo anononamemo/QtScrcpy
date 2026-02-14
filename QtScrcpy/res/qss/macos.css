@@ -1,0 +1,146 @@
+/* macOS native theme — minimal overrides only.
+   Colors come from system QPalette (auto dark/light). */
+
+* {
+    font-family: -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif;
+    font-size: 13px;
+}
+
+QGroupBox {
+    border: 1px solid palette(mid);
+    border-radius: 8px;
+    padding-top: 8px;
+    margin-top: 2ex;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 12px;
+    padding: 0 4px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+QTextEdit#outEdit {
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    border: 1px solid palette(mid);
+    border-radius: 6px;
+    padding: 4px;
+}
+
+/* Primary action buttons — system accent color */
+QPushButton#startServerBtn,
+QPushButton#wirelessConnectBtn,
+QPushButton#wifiConnectBtn,
+QPushButton#usbConnectBtn,
+QPushButton#connectBtn {
+    background-color: palette(highlight);
+    color: palette(highlighted-text);
+    font-weight: bold;
+    border-radius: 6px;
+    padding: 6px 14px;
+    border: none;
+}
+
+QPushButton#startServerBtn:hover,
+QPushButton#wirelessConnectBtn:hover,
+QPushButton#wifiConnectBtn:hover,
+QPushButton#usbConnectBtn:hover,
+QPushButton#connectBtn:hover {
+    background-color: palette(highlight);
+    opacity: 0.9;
+}
+
+/* Danger buttons — red */
+QPushButton#stopServerBtn,
+QPushButton#stopAllServerBtn,
+QPushButton#wirelessDisConnectBtn,
+QPushButton#disconnectBtn {
+    background-color: #FF3B30;
+    color: white;
+    font-weight: bold;
+    border-radius: 6px;
+    padding: 6px 14px;
+    border: none;
+}
+
+QPushButton#stopServerBtn:hover,
+QPushButton#stopAllServerBtn:hover,
+QPushButton#wirelessDisConnectBtn:hover,
+QPushButton#disconnectBtn:hover {
+    background-color: #E0342B;
+}
+
+/* Regular buttons */
+QPushButton {
+    border: 1px solid palette(mid);
+    border-radius: 6px;
+    padding: 5px 12px;
+    background-color: palette(button);
+}
+
+QPushButton:hover {
+    background-color: palette(light);
+}
+
+QPushButton:pressed {
+    background-color: palette(midlight);
+}
+
+/* Tab bar — native segmented look */
+QTabBar::tab {
+    padding: 6px 16px;
+    border: none;
+    border-bottom: 2px solid transparent;
+}
+
+QTabBar::tab:selected {
+    border-bottom: 2px solid palette(highlight);
+    font-weight: 600;
+}
+
+/* Scrollbars — minimal */
+QScrollBar:vertical {
+    width: 8px;
+    background: transparent;
+}
+
+QScrollBar:horizontal {
+    height: 8px;
+    background: transparent;
+}
+
+QScrollBar::handle:vertical,
+QScrollBar::handle:horizontal {
+    background: palette(mid);
+    border-radius: 4px;
+    min-height: 20px;
+    min-width: 20px;
+}
+
+QScrollBar::add-line, QScrollBar::sub-line,
+QScrollBar::add-page, QScrollBar::sub-page {
+    background: none;
+    border: none;
+    height: 0px;
+    width: 0px;
+}
+
+/* ComboBox */
+QComboBox {
+    border: 1px solid palette(mid);
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+
+/* Input fields */
+QLineEdit, QSpinBox {
+    border: 1px solid palette(mid);
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+
+QLineEdit:focus, QSpinBox:focus, QComboBox:focus {
+    border: 1px solid palette(highlight);
+}
